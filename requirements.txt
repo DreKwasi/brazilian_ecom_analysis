@@ -1,8 +1,7 @@
 streamlit
 streamlit-extras
-xgboost
+# xgboost
 scikit-learn
 ipyvizzu
 st-vizzu
-deta
 st-pages
