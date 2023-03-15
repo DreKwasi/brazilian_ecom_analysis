@@ -1,0 +1,8 @@
+streamlit
+streamlit-extras
+xgboost
+scikit-learn
+ipyvizzu
+st-vizzu
+deta
+st-pages
