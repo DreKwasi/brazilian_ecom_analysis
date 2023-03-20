@@ -70,6 +70,7 @@ def filter_widgets(df):
             "customer_state", key="customer_state", options=customer_state, label_visibility="collapsed")
     filters = [date_col, start_date, end_date, sel_order_status, sel_payment_type,
                sel_prod_category, sel_seller_city, sel_seller_state, sel_customer_city, sel_customer_state]
+    
     return filters
 
 
@@ -98,6 +99,6 @@ def filter_data(df, date_col, start_date, end_date, sel_order_status, sel_paymen
         df = df[df['customer_city'].isin(sel_customer_city)]
 
     if len(sel_customer_state) > 0:
-        df = df[df['customer_city'].isin(sel_customer_state)]
+        df = df[df['customer_state'].isin(sel_customer_state)]
 
     return df

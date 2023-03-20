@@ -7,3 +7,5 @@ st-vizzu
 st-pages
 plotly
 plotly-express
+folium
+st-folium

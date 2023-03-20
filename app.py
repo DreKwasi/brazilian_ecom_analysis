@@ -11,8 +11,8 @@ styles.set_png_as_page_bg("assets/img/olist_logo.png")
 
 show_pages([
     Page("app.py", "Home", ),
-    Page("other_pages/crm.py", "CRM Analytics", ), 
-    Page("other_pages/forecast.py", "Forecasting", ), 
+    Page("other_pages/distribution.py", "Distribution Analytics", ), 
+    Page("other_pages/customer_analytics.py", "Customer Analytics", ), 
      
 ])
 
