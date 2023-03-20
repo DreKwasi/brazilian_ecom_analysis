@@ -9,3 +9,4 @@ plotly
 plotly-express
 folium
 st-folium
+haversine
