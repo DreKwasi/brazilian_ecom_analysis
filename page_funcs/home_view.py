@@ -6,8 +6,6 @@ from plotly import graph_objects as go
 from helper_funcs import data_parser, st_filters
 from streamlit_extras.metric_cards import style_metric_cards
 from streamlit_extras.annotated_text import annotated_text
-import folium
-from streamlit_folium import st_folium, folium_static
 from helper_funcs import st_plots
 
 
