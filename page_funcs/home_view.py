@@ -28,7 +28,7 @@ def show():
         ["delivered", "shipped"])]['price'].sum()
     fr = np.round(total_supplied_value/total_request_value * 100, 2)
 
-    st.header("Welcome to Your Ecommerce Insights Dashboard")
+    st.header("Ecommerce Dashboard")
     st.subheader("Order Summary")
 
     col1, col2, col3 = st.columns(3, gap="small")

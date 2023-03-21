@@ -9,6 +9,7 @@ from scipy.cluster import hierarchy
 import plotly.graph_objects as go
 from streamlit_extras.annotated_text import annotated_text
 from helper_funcs.st_plots import get_key_metrics
+from helper_funcs import ml_models
 
 
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
@@ -210,27 +211,24 @@ with tab2:
     st.plotly_chart(fig, use_container_width=True,
                     config={"displayModeBar": False})
 
+st.subheader("Customer Segmentation")
 
 colorscales = px.colors.named_colorscales()
 colorscale = st.selectbox(
     "Select Preferred Color Scale", options=colorscales)
-# Customer Segmentation
+
 col1, col2 = st.columns(2)
 # Geographic Segmentation
 
 
 with col1:
-
+    n_clusters = st.slider("Select Number of Clusters", min_value=2, value=3, max_value=5, key="geo_cluster")
+    
     geo_df = df.groupby(
         by=["customer_lat", "customer_lng"]).first().reset_index()
-
-    clustering_model_no_clusters = AgglomerativeClustering(
-        n_clusters=3, linkage="ward")
-    clustering_model_no_clusters.fit(
-        geo_df[["customer_lat", "customer_lng"]])
-    labels_no_clusters = clustering_model_no_clusters.labels_
-    geo_df["cluster"] = labels_no_clusters
-
+    geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
+                               "customer_lat", "customer_lng"])
+                               
     fig = px.scatter_mapbox(geo_df, lat="customer_lat", lon="customer_lng", color="cluster",
                             labels={"customer_lat": "Latitude",
                                     "customer_lng": "Longitude"},
@@ -243,6 +241,7 @@ with col1:
 
 
 with col2:
+    n_clusters = st.slider("Select Number of Clusters", min_value=2, value=2, max_value=5, key="rev_cluster")
     # # calculate the total price for each customer
     # customer_price = df.groupby('customer_unique_id')['price'].sum()
 
@@ -262,17 +261,13 @@ with col2:
 
     geo_df = df.groupby(["customer_lat", "customer_lng"]).agg(
         {"price": "sum"}).reset_index()
-
-    clustering_model_no_clusters = AgglomerativeClustering(
-        n_clusters=2, linkage="ward")
-    clustering_model_no_clusters.fit(
-        geo_df[["customer_lat", "customer_lng", "price"]])
-    labels_no_clusters = clustering_model_no_clusters.labels_
-    geo_df["cluster"] = labels_no_clusters
+    geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
+                               "customer_lat", "customer_lng", "price"])
 
     fig = px.scatter_mapbox(geo_df, lat="customer_lat", lon="customer_lng", color="cluster",
                             labels={"customer_lat": "Latitude",
-                                    "customer_lng": "Longitude"},
+                                    "customer_lng": "Longitude",
+                                    "price": "Revenue"},
                             color_continuous_scale=colorscale, size="price",
                             zoom=3.5, mapbox_style="open-street-map", height=650)
     fig.update_layout(title=f" Customer Revenue Segmentation",
