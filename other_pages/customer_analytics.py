@@ -136,8 +136,9 @@ with tab1:
 
 
 with tab2:
+    prod_df = df.drop_duplicates(subset="customer_unique_id")
     prod_df = (
-        df.groupby(by="product_category_name").agg(
+        prod_df.groupby(by="product_category_name").agg(
             num_customers=("customer_unique_id", "count")).reset_index()
     )
 
