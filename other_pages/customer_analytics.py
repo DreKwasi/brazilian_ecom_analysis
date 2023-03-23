@@ -89,7 +89,7 @@ renewal_revenue = second_orders['price'].sum()
 # Calculate the revenue renewal rate as a percentage of the total revenue
 revenue_renewal_rate = renewal_revenue / total_revenue * 100
 
-st.header("Customer Insights")
+st.header("Customer Insights 👪")
 st.subheader("Overview")
 
 col1, col2 = st.columns(2, gap="small")

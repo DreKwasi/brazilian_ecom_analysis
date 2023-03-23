@@ -18,9 +18,9 @@ styles.load_css_file("assets/styles/main.css")
 styles.set_png_as_page_bg("assets/img/olist_logo.png")
 
 show_pages([
-    Page("app.py", "General Analytics", ),
-    Page("other_pages/distribution.py", "Distribution Analytics", ),
-    Page("other_pages/customer_analytics.py", "Customer Analytics", ),
+    Page("app.py", "General Analytics", "🏪"),
+    Page("other_pages/distribution.py", "Distribution Analytics", "🚴"),
+    Page("other_pages/customer_analytics.py", "Customer Analytics", "👪"),
 
 ])
 
@@ -44,7 +44,7 @@ total_supplied_value = df[df['order_status'].isin(
     ["delivered", "shipped"])]['price'].sum()
 fr = np.round(total_supplied_value/total_request_value * 100, 2)
 
-st.header("Ecommerce Dashboard")
+st.header("Ecommerce Dashboard 🏪")
 st.subheader("Order Summary")
 
 col1, col2, col3 = st.columns(3, gap="small")

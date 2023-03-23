@@ -40,7 +40,7 @@ avg_delivery_time = df["delivery_time"].mean().days
 
 avg_distance = df["distance_covered"].mean()
 
-st.header("Distribution Insights")
+st.header("Distribution Insights 🚴")
 st.subheader("Overview")
 
 col1, col2, col3 = st.columns(3, gap="small")
