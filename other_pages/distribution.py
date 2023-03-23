@@ -103,13 +103,13 @@ col1, col2 = st.columns(2)
 
 with col1:
     n_clusters = st.slider("Select Number of Clusters",
-                           min_value=2, value=2, max_value=5, key="rev_cluster")
+                           min_value=2, value=3, max_value=5, key="city_cluster")
 
     geo_df = clean_df.groupby(by=['customer_city', "customer_lat", "customer_lng"])[
         'delivery_time'].mean().reset_index()
 
     geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
-                               'customer_city', "customer_lat", "customer_lng"])
+                               'customer_city', "customer_lat", "customer_lng", "delivery_time"])
 
     fig = px.density_mapbox(geo_df, lat="customer_lat", lon="customer_lng", z="delivery_time", radius=10, zoom=3.5,
                             labels={"customer_lat": "latitude", "customer_lng": "longitude",
@@ -126,13 +126,13 @@ with col1:
 
 with col2:
     n_clusters = st.slider("Select Number of Clusters",
-                           min_value=2, value=2, max_value=5, key="rev_cluster")
+                           min_value=2, value=3, max_value=5, key="rev_cluster")
 
     geo_df = clean_df.groupby(by=["customer_lat", "customer_lng"])[
         'distance_covered'].mean().reset_index()
 
     geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
-                               "customer_lat", "customer_lng"])
+                               "customer_lat", "customer_lng", "distance_covered"])
 
     fig = px.scatter_mapbox(geo_df, lat="customer_lat", lon="customer_lng", color="cluster",
                             labels={"distance_covered": "Distance Covered",
