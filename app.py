@@ -12,7 +12,7 @@ from streamlit_extras.annotated_text import annotated_text
 from helper_funcs import st_plots
 
 
-st.set_page_config(layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_icon="🧮", layout="wide", initial_sidebar_state="expanded")
 
 styles.load_css_file("assets/styles/main.css")
 styles.set_png_as_page_bg("assets/img/olist_logo.png")

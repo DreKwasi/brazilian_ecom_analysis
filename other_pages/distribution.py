@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from helper_funcs import ml_models
 
 
-st.set_page_config(layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_icon="🧮", layout="wide", initial_sidebar_state="expanded")
 
 styles.load_css_file("assets/styles/main.css")
 styles.set_png_as_page_bg("assets/img/olist_logo.png")
@@ -24,6 +24,11 @@ df.loc[customer_date_null_mask,
 df = df[df["order_delivered_customer_date"] >= df["order_approved_at"]]
 
 # Sidebar Filters
+
+header = st.sidebar.empty()
+selectbox = st.sidebar.empty()
+
+
 st.sidebar.header("Filters")
 st.sidebar.write("**View Revenue/Volume**")
 view = st.sidebar.selectbox(
@@ -102,19 +107,13 @@ colorscale = st.selectbox(
 col1, col2 = st.columns(2)
 
 with col1:
-    n_clusters = st.slider("Select Number of Clusters",
-                           min_value=2, value=3, max_value=5, key="city_cluster")
-
     geo_df = clean_df.groupby(by=['customer_city', "customer_lat", "customer_lng"])[
         'delivery_time'].mean().reset_index()
-
-    geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
-                               'customer_city', "customer_lat", "customer_lng", "delivery_time"])
 
     fig = px.density_mapbox(geo_df, lat="customer_lat", lon="customer_lng", z="delivery_time", radius=10, zoom=3.5,
                             labels={"customer_lat": "latitude", "customer_lng": "longitude",
                                     "delivery_time": "Delivery_Time"},
-                            mapbox_style="stamen-terrain", color_continuous_scale=colorscale,
+                            mapbox_style="open-street-map", color_continuous_scale=colorscale,
                             range_color=[geo_df['delivery_time'].min(), geo_df['delivery_time'].max()], height=650)
     fig.update_layout(title=f"Heatmap of Delivery Times for Customer Cities", hoverlabel=dict(
                             bgcolor="white", font_size=14, font_family="Rockwell"),)
@@ -123,11 +122,10 @@ with col1:
     st.plotly_chart(fig, use_container_width=True,
                     config={"displayModeBar": False})
 
-
-with col2:
-    n_clusters = st.slider("Select Number of Clusters",
+header.write("**Hierarchical Clustering**")
+n_clusters = selectbox.slider("Select Number of Clusters",
                            min_value=2, value=3, max_value=5, key="rev_cluster")
-
+with col2:
     geo_df = clean_df.groupby(by=["customer_lat", "customer_lng"])[
         'distance_covered'].mean().reset_index()
 
