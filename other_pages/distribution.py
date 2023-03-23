@@ -48,7 +48,7 @@ avg_distance = df["distance_covered"].mean()
 st.header("Distribution Insights 🚴")
 st.subheader("Overview")
 
-col1, col2, col3 = st.columns(3, gap="small")
+col1, col2 = st.columns(2, gap="small")
 
 col1.metric("**Average Delivery Time (Days)**",
             value=f"{avg_delivery_time}")
@@ -56,7 +56,7 @@ col1.metric("**Average Delivery Time (Days)**",
 col2.metric("**Daily Average Distance (miles)**",
             value=f"{data_parser.clean_format(avg_distance)}")
 
-col1, col2, col3 = st.columns(3, gap="small")
+# col1, col2, col3 = st.columns(3, gap="small")
 
 style_metric_cards()
 
