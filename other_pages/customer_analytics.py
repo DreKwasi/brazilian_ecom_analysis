@@ -4,9 +4,6 @@ import numpy as np
 import plotly_express as px
 from helper_funcs import data_parser, styles, st_filters
 from streamlit_extras.metric_cards import style_metric_cards
-from sklearn.cluster import AgglomerativeClustering
-from scipy.cluster import hierarchy
-import plotly.graph_objects as go
 from streamlit_extras.annotated_text import annotated_text
 from helper_funcs.st_plots import get_key_metrics
 from helper_funcs import ml_models
