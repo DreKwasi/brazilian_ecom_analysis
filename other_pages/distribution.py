@@ -4,9 +4,8 @@ import numpy as np
 import plotly_express as px
 from helper_funcs import data_parser, styles, st_filters
 from streamlit_extras.metric_cards import style_metric_cards
-from sklearn.cluster import AgglomerativeClustering
-from scipy.cluster import hierarchy
 import plotly.graph_objects as go
+from helper_funcs import ml_models
 
 
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
@@ -49,7 +48,7 @@ col1, col2, col3 = st.columns(3, gap="small")
 col1.metric("**Average Delivery Time (Days)**",
             value=f"{avg_delivery_time}")
 
-col2.metric("**Daily Average Distance**",
+col2.metric("**Daily Average Distance (miles)**",
             value=f"{data_parser.clean_format(avg_distance)}")
 
 col1, col2, col3 = st.columns(3, gap="small")
@@ -103,8 +102,14 @@ colorscale = st.selectbox(
 col1, col2 = st.columns(2)
 
 with col1:
+    n_clusters = st.slider("Select Number of Clusters",
+                           min_value=2, value=2, max_value=5, key="rev_cluster")
+
     geo_df = clean_df.groupby(by=['customer_city', "customer_lat", "customer_lng"])[
         'delivery_time'].mean().reset_index()
+
+    geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
+                               'customer_city', "customer_lat", "customer_lng"])
 
     fig = px.density_mapbox(geo_df, lat="customer_lat", lon="customer_lng", z="delivery_time", radius=10, zoom=3.5,
                             labels={"customer_lat": "latitude", "customer_lng": "longitude",
@@ -120,15 +125,14 @@ with col1:
 
 
 with col2:
+    n_clusters = st.slider("Select Number of Clusters",
+                           min_value=2, value=2, max_value=5, key="rev_cluster")
+
     geo_df = clean_df.groupby(by=["customer_lat", "customer_lng"])[
         'distance_covered'].mean().reset_index()
 
-    clustering_model_no_clusters = AgglomerativeClustering(
-        n_clusters=3, linkage="ward")
-    clustering_model_no_clusters.fit(
-        geo_df[["customer_lat", "customer_lng", "distance_covered"]])
-    labels_no_clusters = clustering_model_no_clusters.labels_
-    geo_df["cluster"] = labels_no_clusters
+    geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
+                               "customer_lat", "customer_lng"])
 
     fig = px.scatter_mapbox(geo_df, lat="customer_lat", lon="customer_lng", color="cluster",
                             labels={"distance_covered": "Distance Covered",
