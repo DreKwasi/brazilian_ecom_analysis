@@ -7,19 +7,61 @@ from streamlit_extras.metric_cards import style_metric_cards
 from streamlit_extras.annotated_text import annotated_text
 from helper_funcs.st_plots import get_key_metrics
 from helper_funcs import ml_models
+import datetime as dt
 
-
-st.set_page_config(page_icon="🧮", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_icon="🧮", layout="wide",
+                   initial_sidebar_state="expanded")
 
 styles.load_css_file("assets/styles/main.css")
 styles.set_png_as_page_bg("assets/img/olist_logo.png")
 
-df = data_parser.read_data(add_geo_location=True)
 
+@st.cache_data()
+def cohort_analysis(df):
+    # Churn Cohort Analysis
+    customer_df = df.loc[:, ["customer_unique_id", "order_purchase_timestamp"]]
+    customer_df = customer_df[~customer_df.duplicated()]
+    customer_df = customer_df[customer_df['customer_unique_id'].notnull()]
+
+    # Create the order_purchase_month period column
+    customer_df['order_purchase_month'] = customer_df['order_purchase_timestamp'].apply(
+        lambda x: dt.datetime(x.year, x.month, 1))
+    cohort = customer_df.groupby('customer_unique_id')['order_purchase_month']
+    customer_df['CohortMonth'] = cohort.transform('min')
+
+    def get_date_int(df, column):
+        year = df[column].dt.year
+        month = df[column].dt.month
+        return year, month
+
+    # Get the integers for the date parts from the 'InvoiceMonth' column
+    invoice_year, invoice_month = get_date_int(
+        customer_df, 'order_purchase_month')
+
+    # Get the integers for date parts from the 'Cohortmonth' column
+    cohort_year, cohort_month = get_date_int(customer_df, 'CohortMonth')
+
+    # Calculate difference in years
+    years_diff = invoice_year - cohort_year
+
+    # Calculate difference in months
+    months_diff = invoice_month - cohort_month
+
+    # Extract the difference in months from all previous values
+    customer_df['CohortIndex'] = years_diff * 12 + months_diff + 1
+    return customer_df
+
+
+df = data_parser.read_data(add_geo_location=True)
 
 # Sidebar Filters
 st.sidebar.header("Filters")
-st.sidebar.write("**View price/Volume**")
+st.sidebar.write("**Churn Period (Days)**")
+churn_days = st.sidebar.slider("churn_days", min_value=30, max_value=365,
+                               value=90, help="Customers Who Stopped Purchasing After What Number of Days",
+                               label_visibility="collapsed")
+
+st.sidebar.write("**View Revenue/Volume**")
 view = st.sidebar.selectbox(
     "view", options=["Revenue", "Volume"], key="view", label_visibility="collapsed")
 if view == "price":
@@ -28,24 +70,23 @@ if view == "price":
 filters = st_filters.filter_widgets(df)
 df = st_filters.filter_data(df, *filters)
 
-total_customers = df['customer_unique_id'].nunique()
+
+customer_df = df[~df.duplicated()]
+customer_df = customer_df[customer_df['customer_unique_id'].notnull()]
 
 
-# Count the number of unique customers who have not made a purchase in the last 30 days
-churned_customers = len(df.loc[df['order_purchase_timestamp'] < df['order_purchase_timestamp'].max(
-) - pd.Timedelta(days=365), 'customer_unique_id'].unique())
+total_customers = customer_df['customer_unique_id'].nunique()
 
-# Calculate the churn rate as a percentage of the total customer base
-churn_rate = churned_customers / total_customers * 100
+# Count the number of unique customers who have made a purchase in the last 180 days
+customer_df['Churn'] = np.where(customer_df['order_purchase_timestamp'] >= customer_df['order_purchase_timestamp'].max(
+) - pd.Timedelta(days=churn_days), 0, 1)
 
-
-# Count the number of unique customers who have made a purchase in the last 30 days
-retained_customers = len(df.loc[df['order_purchase_timestamp'] >= df['order_purchase_timestamp'].max(
-) - pd.Timedelta(days=30), 'customer_unique_id'].unique())
+retained_customers = customer_df.loc[customer_df['Churn']
+                                     == 0, "customer_unique_id"].nunique()
 
 # Calculate the customer retention rate as a percentage of the total customer base
 customer_retention_rate = retained_customers / total_customers * 100
-
+churn_rate = 100 - customer_retention_rate
 
 # Create a new dataframe containing only the orders that have been delivered
 delivered_orders = df.loc[df['order_delivered_customer_date'].notnull()]
@@ -103,13 +144,14 @@ col1, col2, col3, col4 = st.columns(4, gap="small")
 col1.metric("**Customer Retention Rate**",
             value=f"{data_parser.clean_format(customer_retention_rate)} %")
 col2.metric("**Customer Churn Rate**",
-            value=f"{data_parser.clean_format(churn_rate)} %")
+            value=f"{data_parser.clean_format(churn_rate)} %",
+            help="Customers who haven't made a purchase in the past year")
 col3.metric("**Customer Renewal Rate**",
             value=f"{data_parser.clean_format(renewal_rate)} %")
 col4.metric("**Revenue Renewal Rate**",
             value=f"{data_parser.clean_format(revenue_renewal_rate)} %")
 style_metric_cards()
-
+st.divider()
 
 st.subheader("Visualization")
 
@@ -125,7 +167,7 @@ with tab1:
     fig = px.line(cus_df, x="order_approved_at", y="Number_of_Customers")
     fig.update_layout(
         showlegend=False,
-        title=f"{freq} Customer Traffic by Order Day",
+        title=f"{freq} Customer Traffic",
         hoverlabel=dict(bgcolor="white", font_size=14,
                         font_family="Rockwell"),
     )
@@ -208,9 +250,105 @@ with tab2:
     st.plotly_chart(fig, use_container_width=True,
                     config={"displayModeBar": False})
 
-st.subheader("Customer Segmentation")
+st.divider()
+
+st.subheader("Churn/Retention Breakdown")
+st.write("#### Retention Cohort Analysis")
+
+# Churn/Retention Cohort Analysis
+cohort_df = cohort_analysis(df)
+grouping = cohort_df.groupby(['CohortMonth', 'CohortIndex'])
+
+# Count the number of unique values per Customer ID
+cohort_data = grouping['customer_unique_id'].apply(
+    pd.Series.nunique).reset_index()
+
+# Create a pivot
+cohort_counts = cohort_data.pivot(
+    index='CohortMonth', columns='CohortIndex', values='customer_unique_id')
+cohort_counts.fillna(0, inplace=True)
+
+# Select the first column and store it to cohort_sizes
+cohort_sizes = cohort_counts.iloc[:, 0]
+
+# Divide the cohort count by cohort sizes along the rows
+
+retention = cohort_counts.divide(cohort_sizes, axis=0)*100
+retention.index = retention.index.strftime("%Y-%B")
 
 colorscales = px.colors.named_colorscales()
+
+scale = st.selectbox(
+    "Select A Color Scale", options=colorscales, index=4, key="t3"
+)
+
+fig = px.imshow(
+    retention.values.tolist(),
+    labels=dict(x="CohortIndex", y="CohortMonth", color="Retention Rate"),
+    x=retention.columns.tolist(),
+    y=retention.index.tolist(),
+    color_continuous_scale=scale,
+    title=f"Retention By Month Cohorts",
+    template="presentation",
+    text_auto=".2f"
+)
+with fig.batch_update():
+    fig.update_xaxes(side="top")
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=100, b=0),
+        hoverlabel=dict(bgcolor="white", font_size=14,
+                        font_family="Rockwell"),
+        hovermode="x",
+
+    )
+st.plotly_chart(
+    fig,
+    use_container_width=True,
+    config={"displayModeBar": False},
+)
+
+with st.expander("View Retention Matrix"):
+    st.dataframe(retention)
+
+
+# Relationship of Churn with some variables
+st.write("#### Relationship of Churn with Select Variables")
+
+variables_dict = {
+    "Payment Type": "payment_type",
+    "Customer State": "customer_state",
+    "Seller State": "seller_state",
+    
+}
+variable_key = st.selectbox(
+    "Select Variable To Visualize Relationship", options=variables_dict.keys())
+chosen_col = variables_dict[variable_key]
+
+payment_type_plt = customer_df.groupby(
+    by=chosen_col).Churn.mean().reset_index()
+
+payment_type_plt.sort_values("Churn", ascending=False, inplace=True)
+fig = px.bar(payment_type_plt, x=chosen_col, y="Churn", color=chosen_col,
+             title=f"Relationship Between Churn and {variable_key}", template="presentation")
+with fig.batch_update():
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=100, b=0),
+        hoverlabel=dict(bgcolor="white", font_size=14,
+                        font_family="Rockwell"),
+        hovermode="x",
+        showlegend=False
+
+    )
+    fig.update_xaxes(title_text=variable_key)
+    fig.update_yaxes(title_text="Average Churn")
+
+st.plotly_chart(
+    fig,
+    use_container_width=True,
+    config={"displayModeBar": False},
+)
+st.divider()
+st.subheader("Customer Segmentation")
 colorscale = st.selectbox(
     "Select Preferred Color Scale", options=colorscales)
 
@@ -219,13 +357,14 @@ col1, col2 = st.columns(2)
 
 
 with col1:
-    n_clusters = st.slider("Select Number of Clusters", min_value=2, value=3, max_value=5, key="geo_cluster")
-    
+    n_clusters = st.slider("Select Number of Clusters",
+                           min_value=2, value=3, max_value=5, key="geo_cluster")
+
     geo_df = df.groupby(
         by=["customer_lat", "customer_lng"]).first().reset_index()
     geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
                                "customer_lat", "customer_lng"])
-                               
+
     fig = px.scatter_mapbox(geo_df, lat="customer_lat", lon="customer_lng", color="cluster",
                             labels={"customer_lat": "Latitude",
                                     "customer_lng": "Longitude"},
@@ -238,7 +377,8 @@ with col1:
 
 
 with col2:
-    n_clusters = st.slider("Select Number of Clusters", min_value=2, value=2, max_value=5, key="rev_cluster")
+    n_clusters = st.slider("Select Number of Clusters",
+                           min_value=2, value=2, max_value=5, key="rev_cluster")
     # # calculate the total price for each customer
     # customer_price = df.groupby('customer_unique_id')['price'].sum()
 
