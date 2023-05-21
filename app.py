@@ -1,11 +1,9 @@
-import streamlit as st
 from st_pages import Page, Section, show_pages, add_page_title
 from helper_funcs import styles
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly_express as px
-from plotly import graph_objects as go
 from helper_funcs import data_parser, st_filters
 from streamlit_extras.metric_cards import style_metric_cards
 from streamlit_extras.annotated_text import annotated_text
@@ -44,7 +42,7 @@ total_supplied_value = df[df['order_status'].isin(
     ["delivered", "shipped"])]['price'].sum()
 fr = np.round(total_supplied_value/total_request_value * 100, 2)
 
-st.header("Ecommerce Dashboard 🏪")
+st.header("Sales Dashboard 🎫")
 st.subheader("Order Summary")
 
 col1, col2, col3 = st.columns(3, gap="small")
@@ -59,11 +57,13 @@ col1, col2, col3 = st.columns(3, gap="small")
 
 style_metric_cards()
 
+st.subheader("Performance Breakdown")
 if view == "Revenue 💸":
     st_plots.revenue_plots(df)
 if view == "Volume 📦":
     st_plots.volume_plots(df)
 
+st.subheader("Ordering Activity")
 time_match = {"Order Purchase Time": "order_purchase_timestamp",
               "Order Delivered Carrier Date": "order_delivered_carrier_date",
               "Order Delivered Customer Date": "order_delivered_customer_date"}
@@ -75,7 +75,6 @@ ht_df = df.groupby(sel_col).agg(
     num_orders=("order_id", "count")).reset_index()
 
 # Day vs Hour
-# st.subheader("Testing Frequency")
 tab1, tab2, tab3 = st.tabs(
     ["Daily vs Hourly Comparison", "Daily vs Weekly Comparison",
         "Monthly vs Weekly Comparison"]
