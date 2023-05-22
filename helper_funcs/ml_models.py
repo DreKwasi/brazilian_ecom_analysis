@@ -62,6 +62,8 @@ def prediction(_model, df):
 @st.cache_resource()
 def pycaret_modelling(df):
     model = load_model("best_model")
+    s = setup(data=df, target="Churn", categorical_features=["customer_city", "seller_city", "order_status", "seller_state", "payment_type", "customer_state",
+                                                             "product_category_name"], session_id=153)
     with st.expander("Show Model Plots"):
         st.write(model)
         plot_model(model, "auc", scale=1, plot_kwargs={
