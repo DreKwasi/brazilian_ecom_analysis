@@ -22,6 +22,8 @@ defaultmodels = {
     "KNearest Neighbours": KNeighborsClassifier,
 }
 
+model = load_model("best_model")
+
 
 @st.cache_data(show_spinner=False)
 def cluster(n_clusters: int, df: pd.DataFrame, columns: list = ["customer_lat", "customer_lng", "distance_covered"]) -> pd.DataFrame:
@@ -61,9 +63,9 @@ def prediction(_model, df):
 
 @st.cache_resource()
 def pycaret_modelling(df):
-    model = load_model("best_model")
-    s = setup(data=df, target="Churn", categorical_features=["customer_city", "seller_city", "order_status", "seller_state", "payment_type", "customer_state",
-                                                             "product_category_name"], session_id=153)
+    s = setup(data=df, target="Churn", categorical_features=["customer_city", "seller_city", "order_status", "seller_state", 
+                                                             "payment_type", "customer_state",
+                                                             "product_category_name"], session_id=123, verbose=False)
     with st.expander("Show Model Plots"):
         st.write(model)
         plot_model(model, "auc", scale=1, plot_kwargs={
@@ -77,5 +79,4 @@ def pycaret_modelling(df):
 
 @st.cache_data()
 def pycaret_prediction(df):
-    model = load_model("best_model")
     return model.predict_proba(df)[:, 1]

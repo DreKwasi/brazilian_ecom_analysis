@@ -354,27 +354,27 @@ st.subheader("Churn Prediction")
 days_joined = st.columns(2)[0].select_slider(
     "Select Number of Days for Prediction", options=[60, 90, 180], value=60)
 
-new_customers = customer_df.loc[customer_df.order_purchase_timestamp >=
-                                customer_df.order_purchase_timestamp.max() - pd.Timedelta(days=days_joined), :]
-
-
 mask = customer_df.columns.isin(["order_id", "customer_id", "order_purchase_timestamp",
                                 "order_approved_at", "order_delivered_carrier_date",
                                  "order_delivered_customer_date", "order_estimated_delivery_date",
                                  "order_item_id", "product_id", "seller_id", "shipping_limit_date", "customer_unique_id",
                                  "geolocation_city_x", "geolocation_city_y", "geolocation_state_x", "geolocation_state_y"])
-df_model = customer_df.loc[:, ~(mask)]
+df_model = customer_df.loc[:, ~(mask)].copy()
 df_model = df_model.astype({
     "customer_city": "category",
     "seller_city": "category"
 })
+new_customers = customer_df.loc[(customer_df.order_purchase_timestamp >=
+                                customer_df.order_purchase_timestamp.max() - pd.Timedelta(days=days_joined)), :]
+
+df_pred = new_customers.loc[:, df_model.columns].drop("Churn", axis=1)
 
 st.write("Pycaret's Best Model")
 ml_models.pycaret_modelling(df_model)
 
 st.write("Prediction Using Pycaret Best Model")
 new_customers.loc[:, "churn_probability"] = ml_models.pycaret_prediction(
-    new_customers.loc[:, ~(mask)].drop("Churn", axis=1))
+    df_pred)
 
 with st.expander(
         f"Showing Predictions of {data_parser.clean_format(new_customers.shape[0])} Customers Who Made A Purchase in the Last {days_joined} Days"):
@@ -389,7 +389,7 @@ model = ml_models.train(df_model.drop(
 
 st.write("Prediction Using Standalone Models")
 new_customers.loc[:, "churn_probability"] = ml_models.prediction(
-    model, new_customers[df_model.columns])
+    model, df_pred)
 
 with st.expander(
         f"Showing Predictions of {data_parser.clean_format(new_customers.shape[0])} Customers Who Made A Purchase in the Last {days_joined} Days"):
