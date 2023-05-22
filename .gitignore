@@ -2,3 +2,4 @@ py_env/
 raw_data/
 __pycache__/
 map.py
+logs.log

@@ -73,8 +73,6 @@ df = st_filters.filter_data(df, *filters)
 
 customer_df = df[~df.duplicated()]
 customer_df = customer_df[customer_df['customer_unique_id'].notnull()]
-
-
 total_customers = customer_df['customer_unique_id'].nunique()
 
 # Count the number of unique customers who have made a purchase in the last 180 days
@@ -318,7 +316,8 @@ variables_dict = {
     "Payment Type": "payment_type",
     "Customer State": "customer_state",
     "Seller State": "seller_state",
-    
+    "Product Categories": "product_category_name"
+
 }
 variable_key = st.selectbox(
     "Select Variable To Visualize Relationship", options=variables_dict.keys())
@@ -348,13 +347,62 @@ st.plotly_chart(
     config={"displayModeBar": False},
 )
 st.divider()
+
+
+st.subheader("Churn Prediction")
+# Predicting Probability of Churn of Customers Who Joined in the Last 30 Days
+days_joined = st.columns(2)[0].select_slider(
+    "Select Number of Days for Prediction", options=[60, 90, 180], value=60)
+
+new_customers = customer_df.loc[customer_df.order_purchase_timestamp >=
+                                customer_df.order_purchase_timestamp.max() - pd.Timedelta(days=days_joined), :]
+
+
+mask = customer_df.columns.isin(["order_id", "customer_id", "order_purchase_timestamp",
+                                "order_approved_at", "order_delivered_carrier_date",
+                                 "order_delivered_customer_date", "order_estimated_delivery_date",
+                                 "order_item_id", "product_id", "seller_id", "shipping_limit_date", "customer_unique_id",
+                                 "geolocation_city_x", "geolocation_city_y", "geolocation_state_x", "geolocation_state_y"])
+df_model = customer_df.loc[:, ~(mask)]
+df_model = df_model.astype({
+    "customer_city": "category",
+    "seller_city": "category"
+})
+
+st.write("Pycaret's Best Model")
+ml_models.pycaret_modelling(df_model)
+
+st.write("Prediction Using Pycaret Best Model")
+new_customers.loc[:, "churn_probability"] = ml_models.pycaret_prediction(
+    new_customers.loc[:, ~(mask)].drop("Churn", axis=1))
+
+with st.expander(
+        f"Showing Predictions of {data_parser.clean_format(new_customers.shape[0])} Customers Who Made A Purchase in the Last {days_joined} Days"):
+    st.dataframe(
+        new_customers[["customer_unique_id", "Churn", "churn_probability"]])
+
+st.write("Using Standalone Models")
+selected_key = st.selectbox("Select Model", options=[
+                            "Logistic Regression", "KNearest Neighbours"])
+model = ml_models.train(df_model.drop(
+    columns=['Churn', 'seller_city', 'customer_city']), df_model['Churn'], selected_key)
+
+st.write("Prediction Using Standalone Models")
+new_customers.loc[:, "churn_probability"] = ml_models.prediction(
+    model, new_customers[df_model.columns])
+
+with st.expander(
+        f"Showing Predictions of {data_parser.clean_format(new_customers.shape[0])} Customers Who Made A Purchase in the Last {days_joined} Days"):
+    st.dataframe(
+        new_customers[["customer_unique_id", "Churn", "churn_probability"]])
+
+
+# Geographic Segmentation
 st.subheader("Customer Segmentation")
 colorscale = st.selectbox(
     "Select Preferred Color Scale", options=colorscales)
 
 col1, col2 = st.columns(2)
-# Geographic Segmentation
-
 
 with col1:
     n_clusters = st.slider("Select Number of Clusters",
@@ -379,22 +427,6 @@ with col1:
 with col2:
     n_clusters = st.slider("Select Number of Clusters",
                            min_value=2, value=2, max_value=5, key="rev_cluster")
-    # # calculate the total price for each customer
-    # customer_price = df.groupby('customer_unique_id')['price'].sum()
-
-    # # calculate the number of orders for each customer
-    # customer_orders = df.groupby('customer_unique_id')['order_id'].nunique()
-
-    # # calculate the AOV and APF for each customer
-    # aov = customer_price / customer_orders
-    # apf = customer_orders / df['customer_unique_id'].nunique()
-    # clv = aov * apf * 12 * 5
-    # clv = clv.reset_index()
-    # clv.rename(columns={0: "customer_lifetime_value"}, inplace=True)
-    # geo_df = df.merge(clv, how="inner", on="customer_unique_id")
-
-    # geo_df = geo_df.groupby(["customer_lat", "customer_lng"]).agg(
-    #     {"customer_lifetime_value": "sum"}).reset_index()
 
     geo_df = df.groupby(["customer_lat", "customer_lng"]).agg(
         {"price": "sum"}).reset_index()

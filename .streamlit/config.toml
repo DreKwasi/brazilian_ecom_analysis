@@ -4,5 +4,4 @@ primaryColor="#5463c1"
 
 
 [server]
-showWarningOnDirectExecution = false
 runOnSave = true
