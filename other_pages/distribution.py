@@ -15,6 +15,7 @@ styles.load_css_file("assets/styles/main.css")
 styles.set_png_as_page_bg("assets/img/olist_logo.png")
 
 df = data_parser.read_data(add_geo_location=True)
+total_num_orders = df['order_id'].nunique()
 
 df = df[df['order_status'] == "delivered"]
 customer_date_null_mask = df['order_delivered_customer_date'].isna()
@@ -36,19 +37,22 @@ df = st_filters.filter_data(df, *filters)
 
 
 df["delivery_time"] = df["order_delivered_customer_date"] - df["order_approved_at"]
+clean_df = df.drop_duplicates(subset=["order_id", "product_id"]).copy()
+total_num = clean_df['order_id'].nunique()
 avg_delivery_time = df["delivery_time"].mean().days
-
 avg_distance = df["distance_covered"].mean()
 
 st.header("Distribution Insights 🚴")
 st.subheader("Overview")
 
-col1, col2 = st.columns(2, gap="small")
+col1, col2, col3 = st.columns(3, gap="small")
 
-col1.metric("**Average Delivery Time (Days)**",
+col1.metric("**Total Deliveries Completed**",
+            value=f"{data_parser.clean_format(total_num)}", delta=f"{data_parser.clean_format(total_num-total_num_orders)} orders")
+col2.metric("**Average Delivery Time (Days)**",
             value=f"{avg_delivery_time}")
 
-col2.metric("**Daily Average Distance (miles)**",
+col3.metric("**Daily Average Distance (miles)**",
             value=f"{data_parser.clean_format(avg_distance)}")
 
 # col1, col2, col3 = st.columns(3, gap="small")
@@ -61,7 +65,7 @@ clean_df = df.drop_duplicates(subset=["order_id", "product_id"]).copy()
 clean_df['delivery_time'] = clean_df['delivery_time'].dt.days
 
 freq = st.selectbox("Select Frequency for Trend", options=[
-    "Daily", "Weekly", "Monthly"])
+    "Daily", "Weekly", "Monthly"], index=1)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -116,8 +120,9 @@ with tab1:
     if st.checkbox("Remove Outliers (Using IQR)", key="check_a"):
         plt_df = data_parser.removeOutliers(clean_df, vars_dict[variable])
     st.write("Select Number of Bins")
-    bins = st.slider('bins',min_value=50, max_value=round(np.sqrt(clean_df.shape[0])), label_visibility="collapsed")
-    
+    bins = st.slider('bins', min_value=50, max_value=round(
+        np.sqrt(clean_df.shape[0])), label_visibility="collapsed")
+
     fig = px.histogram(plt_df, x=vars_dict[variable],
                        nbins=bins, title=f"Distribution of {variable}")
     fig.update_layout(hoverlabel=dict(
@@ -131,17 +136,17 @@ with tab2:
 
     daily_dist_df = clean_df.groupby(by=[pd.Grouper(key='order_delivered_customer_date', freq='D'),
                                          "Days", "order_id"]).agg({vars_dict[variable]: "sum"}).reset_index()
-    
+
     daily_dist_df["Days"] = pd.Categorical(
         daily_dist_df["Days"], categories=data_parser.days(), ordered=True
     )
     daily_dist_df = daily_dist_df.sort_values(by='Days', ascending=True)
-    
+
     plt_df = daily_dist_df.copy()
-    
+
     if st.checkbox("Remove Outliers (Using IQR)", key="check_b"):
         plt_df = data_parser.removeOutliers(daily_dist_df, vars_dict[variable])
-            
+
     fig = px.box(plt_df, x='Days', y=vars_dict[variable],
                  color='Days', points="outliers", title=f"Daily Distribution of {variable}")
     fig.update_layout(hoverlabel=dict(
