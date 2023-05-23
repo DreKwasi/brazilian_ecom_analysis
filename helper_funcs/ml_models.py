@@ -10,7 +10,7 @@ from sklearn import metrics
 from pycaret.classification import *
 import streamlit as st
 import pandas as pd
-
+import plotly_express as px
 
 coltransform = make_column_transformer(
     (OrdinalEncoder(), ["order_status", "seller_state", "payment_type", "customer_state",
@@ -22,7 +22,9 @@ defaultmodels = {
     "KNearest Neighbours": KNeighborsClassifier,
 }
 
-model = load_model("best_model")
+st.cache_resource()
+def get_model():
+    model = load_model("best_model")
 
 
 @st.cache_data(show_spinner=False)
@@ -63,20 +65,35 @@ def prediction(_model, df):
 
 @st.cache_resource()
 def pycaret_modelling(df):
-    s = setup(data=df, target="Churn", categorical_features=["customer_city", "seller_city", "order_status", "seller_state", 
+    model = get_model()
+
+    s = setup(data=df, target="Churn", categorical_features=["customer_city", "seller_city", "order_status", "seller_state",
                                                              "payment_type", "customer_state",
                                                              "product_category_name"], session_id=123, verbose=False)
+    # feature_names = df.drop("Churn", axis=1).columns
+    # importances = model.feature_importances_
+    #     # Create a dataframe from feature importances
+    # df_importances = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
+
+    # # Sort the dataframe by importance in descending order
+    # df_importances = df_importances.sort_values(by='Importance', ascending=False)
+
     with st.expander("Show Model Plots"):
-        st.write(model)
+
+        # Plot feature importances using Plotly Express
+        # fig = px.bar(df_importances, x='Feature', y='Importance', title='Feature Importances')
+        # st.plotly_chart(fig)
         plot_model(model, "auc", scale=1, plot_kwargs={
                    "percent": True}, display_format="streamlit")
         plot_model(model, "confusion_matrix", scale=1, plot_kwargs={
                    "percent": True}, display_format="streamlit")
         plot_model(model, "class_report", scale=1, plot_kwargs={
                    "percent": True}, display_format="streamlit")
+
     return model
 
 
 @st.cache_data()
 def pycaret_prediction(df):
+    model = get_model()
     return model.predict_proba(df)[:, 1]
