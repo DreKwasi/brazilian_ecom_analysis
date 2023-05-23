@@ -89,3 +89,18 @@ def days():
         dicts = json.load(f)
 
     return dicts["days"]
+
+
+# Removing the outliers
+@st.cache_data()
+def removeOutliers(data, col):
+    Q3 = data[col].quantile(0.75)
+    Q1 = data[col].quantile(0.25)
+    IQR = Q3 - Q1
+ 
+    lower_range = Q1 - (1.5 * IQR)
+    upper_range = Q3 + (1.5 * IQR)
+    
+    filtered_data = data[(data[col] > lower_range) & (data[col] < upper_range)]
+    
+    return filtered_data
