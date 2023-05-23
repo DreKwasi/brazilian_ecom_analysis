@@ -8,7 +8,8 @@ import plotly.graph_objects as go
 from helper_funcs import ml_models
 
 
-st.set_page_config(page_icon="🧮", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_icon="🧮", layout="wide",
+                   initial_sidebar_state="expanded")
 
 styles.load_css_file("assets/styles/main.css")
 styles.set_png_as_page_bg("assets/img/olist_logo.png")
@@ -30,12 +31,6 @@ selectbox = st.sidebar.empty()
 
 
 st.sidebar.header("Filters")
-st.sidebar.write("**View Revenue/Volume**")
-view = st.sidebar.selectbox(
-    "view", options=["Revenue", "Volume"], key="view", label_visibility="collapsed")
-if view == "Revenue":
-    if st.sidebar.checkbox("Add Freight Value to Order"):
-        df['price'] = df['price'] + df['freight_value']
 filters = st_filters.filter_widgets(df)
 df = st_filters.filter_data(df, *filters)
 
@@ -100,7 +95,64 @@ with col2:
     st.plotly_chart(fig, use_container_width=True,
                     config={"displayModeBar": False})
 
+vars_dict = {
+    "Delivery Time (Days)": "delivery_time",
+    "Distance Covered (Miles)": "distance_covered"
+}
 
+
+st.subheader("Distribution Breakdown")
+# st.dataframe(clean_df)
+st.write("Select Variable to Display Distribution")
+variable = st.selectbox(
+    label='vars', options=vars_dict.keys(), label_visibility="collapsed")
+
+tab1, tab2 = st.tabs(["Overall Distribution", "Daily Distribution"])
+clean_df['Days'] = clean_df['order_delivered_customer_date'].dt.day_name()
+
+
+with tab1:
+    plt_df = clean_df
+    if st.checkbox("Remove Outliers (Using IQR)", key="check_a"):
+        plt_df = data_parser.removeOutliers(clean_df, vars_dict[variable])
+    st.write("Select Number of Bins")
+    bins = st.slider('bins',min_value=50, max_value=round(np.sqrt(clean_df.shape[0])), label_visibility="collapsed")
+    
+    fig = px.histogram(plt_df, x=vars_dict[variable],
+                       nbins=bins, title=f"Distribution of {variable}")
+    fig.update_layout(hoverlabel=dict(
+        bgcolor="white", font_size=14, font_family="Rockwell"),)
+    fig.update_xaxes(title=variable)
+    fig.update_yaxes(title="Counts")
+    st.plotly_chart(fig, use_container_width=True,
+                    config={"displayModeBar": False})
+
+with tab2:
+
+    daily_dist_df = clean_df.groupby(by=[pd.Grouper(key='order_delivered_customer_date', freq='D'),
+                                         "Days", "order_id"]).agg({vars_dict[variable]: "sum"}).reset_index()
+    
+    daily_dist_df["Days"] = pd.Categorical(
+        daily_dist_df["Days"], categories=data_parser.days(), ordered=True
+    )
+    daily_dist_df = daily_dist_df.sort_values(by='Days', ascending=True)
+    
+    plt_df = daily_dist_df.copy()
+    
+    if st.checkbox("Remove Outliers (Using IQR)", key="check_b"):
+        plt_df = data_parser.removeOutliers(daily_dist_df, vars_dict[variable])
+            
+    fig = px.box(plt_df, x='Days', y=vars_dict[variable],
+                 color='Days', points="outliers", title=f"Daily Distribution of {variable}")
+    fig.update_layout(hoverlabel=dict(
+        bgcolor="white", font_size=14, font_family="Rockwell"),)
+    fig.update_xaxes(title="Days")
+    fig.update_yaxes(title=variable)
+
+    st.plotly_chart(fig, use_container_width=True,
+                    config={"displayModeBar": False})
+
+st.subheader("Distribution Maps")
 colorscales = px.colors.named_colorscales()
 colorscale = st.selectbox(
     "Select Preferred Color Scale", options=colorscales)
@@ -124,7 +176,7 @@ with col1:
 
 header.write("**Hierarchical Clustering**")
 n_clusters = selectbox.slider("Select Number of Clusters",
-                           min_value=2, value=3, max_value=5, key="rev_cluster")
+                              min_value=2, value=3, max_value=5, key="rev_cluster")
 with col2:
     geo_df = clean_df.groupby(by=["customer_lat", "customer_lng"])[
         'distance_covered'].mean().reset_index()
