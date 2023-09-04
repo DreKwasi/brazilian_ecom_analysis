@@ -13,8 +13,18 @@ import pandas as pd
 import plotly_express as px
 
 coltransform = make_column_transformer(
-    (OrdinalEncoder(), ["order_status", "seller_state", "payment_type", "customer_state",
-                        "product_category_name"]), remainder="passthrough")
+    (
+        OrdinalEncoder(),
+        [
+            "order_status",
+            "seller_state",
+            "payment_type",
+            "customer_state",
+            "product_category_name",
+        ],
+    ),
+    remainder="passthrough",
+)
 
 
 defaultmodels = {
@@ -23,17 +33,24 @@ defaultmodels = {
 }
 
 st.cache_resource()
+
+
 def get_model():
     model = load_model("best_model")
+    return model
 
 
 @st.cache_data(show_spinner=False)
-def cluster(n_clusters: int, df: pd.DataFrame, columns: list = ["customer_lat", "customer_lng", "distance_covered"]) -> pd.DataFrame:
+def cluster(
+    n_clusters: int,
+    df: pd.DataFrame,
+    columns: list = ["customer_lat", "customer_lng", "distance_covered"],
+) -> pd.DataFrame:
     with st.spinner():
         clustering_model_no_clusters = AgglomerativeClustering(
-            n_clusters=n_clusters, linkage="ward")
-        clustering_model_no_clusters.fit(
-            df[columns])
+            n_clusters=n_clusters, linkage="ward"
+        )
+        clustering_model_no_clusters.fit(df[columns])
         labels_no_clusters = clustering_model_no_clusters.labels_
         df["cluster"] = labels_no_clusters
         return df
@@ -42,7 +59,8 @@ def cluster(n_clusters: int, df: pd.DataFrame, columns: list = ["customer_lat", 
 @st.cache_resource()
 def train(X: pd.DataFrame, y: pd.DataFrame, selected_key):
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.30, random_state=50)
+        X, y, test_size=0.30, random_state=50
+    )
 
     model = defaultmodels[selected_key]()
     pipeline = make_pipeline(coltransform, model)
@@ -66,10 +84,23 @@ def prediction(_model, df):
 @st.cache_resource()
 def pycaret_modelling(df):
     model = get_model()
+    st.write(model)
 
-    s = setup(data=df, target="Churn", categorical_features=["customer_city", "seller_city", "order_status", "seller_state",
-                                                             "payment_type", "customer_state",
-                                                             "product_category_name"], session_id=123, verbose=False)
+    s = setup(
+        data=df,
+        target="Churn",
+        categorical_features=[
+            "customer_city",
+            "seller_city",
+            "order_status",
+            "seller_state",
+            "payment_type",
+            "customer_state",
+            "product_category_name",
+        ],
+        session_id=123,
+        verbose=False,
+    )
     # feature_names = df.drop("Churn", axis=1).columns
     # importances = model.feature_importances_
     #     # Create a dataframe from feature importances
@@ -79,16 +110,30 @@ def pycaret_modelling(df):
     # df_importances = df_importances.sort_values(by='Importance', ascending=False)
 
     with st.expander("Show Model Plots"):
-
         # Plot feature importances using Plotly Express
         # fig = px.bar(df_importances, x='Feature', y='Importance', title='Feature Importances')
         # st.plotly_chart(fig)
-        plot_model(model, "auc", scale=1, plot_kwargs={
-                   "percent": True}, display_format="streamlit")
-        plot_model(model, "confusion_matrix", scale=1, plot_kwargs={
-                   "percent": True}, display_format="streamlit")
-        plot_model(model, "class_report", scale=1, plot_kwargs={
-                   "percent": True}, display_format="streamlit")
+        plot_model(
+            model,
+            "auc",
+            scale=1,
+            plot_kwargs={"percent": True},
+            display_format="streamlit",
+        )
+        plot_model(
+            model,
+            "confusion_matrix",
+            scale=1,
+            plot_kwargs={"percent": True},
+            display_format="streamlit",
+        )
+        plot_model(
+            model,
+            "class_report",
+            scale=1,
+            plot_kwargs={"percent": True},
+            display_format="streamlit",
+        )
 
     return model
 

@@ -9,8 +9,7 @@ from helper_funcs.st_plots import get_key_metrics
 from helper_funcs import ml_models
 import datetime as dt
 
-st.set_page_config(page_icon="🧮", layout="wide",
-                   initial_sidebar_state="expanded")
+st.set_page_config(page_icon="🧮", layout="wide", initial_sidebar_state="expanded")
 
 styles.load_css_file("assets/styles/main.css")
 styles.set_png_as_page_bg("assets/img/olist_logo.png")
@@ -21,13 +20,14 @@ def cohort_analysis(df):
     # Churn Cohort Analysis
     customer_df = df.loc[:, ["customer_unique_id", "order_purchase_timestamp"]]
     customer_df = customer_df[~customer_df.duplicated()]
-    customer_df = customer_df[customer_df['customer_unique_id'].notnull()]
+    customer_df = customer_df[customer_df["customer_unique_id"].notnull()]
 
     # Create the order_purchase_month period column
-    customer_df['order_purchase_month'] = customer_df['order_purchase_timestamp'].apply(
-        lambda x: dt.datetime(x.year, x.month, 1))
-    cohort = customer_df.groupby('customer_unique_id')['order_purchase_month']
-    customer_df['CohortMonth'] = cohort.transform('min')
+    customer_df["order_purchase_month"] = customer_df["order_purchase_timestamp"].apply(
+        lambda x: dt.datetime(x.year, x.month, 1)
+    )
+    cohort = customer_df.groupby("customer_unique_id")["order_purchase_month"]
+    customer_df["CohortMonth"] = cohort.transform("min")
 
     def get_date_int(df, column):
         year = df[column].dt.year
@@ -35,11 +35,10 @@ def cohort_analysis(df):
         return year, month
 
     # Get the integers for the date parts from the 'InvoiceMonth' column
-    invoice_year, invoice_month = get_date_int(
-        customer_df, 'order_purchase_month')
+    invoice_year, invoice_month = get_date_int(customer_df, "order_purchase_month")
 
     # Get the integers for date parts from the 'Cohortmonth' column
-    cohort_year, cohort_month = get_date_int(customer_df, 'CohortMonth')
+    cohort_year, cohort_month = get_date_int(customer_df, "CohortMonth")
 
     # Calculate difference in years
     years_diff = invoice_year - cohort_year
@@ -48,7 +47,7 @@ def cohort_analysis(df):
     months_diff = invoice_month - cohort_month
 
     # Extract the difference in months from all previous values
-    customer_df['CohortIndex'] = years_diff * 12 + months_diff + 1
+    customer_df["CohortIndex"] = years_diff * 12 + months_diff + 1
     return customer_df
 
 
@@ -57,73 +56,110 @@ df = data_parser.read_data(add_geo_location=True)
 # Sidebar Filters
 st.sidebar.header("Filters")
 st.sidebar.write("**Churn Period (Days)**")
-churn_days = st.sidebar.slider("churn_days", min_value=30, max_value=365,
-                               value=90, help="Customers Who Stopped Purchasing After What Number of Days",
-                               label_visibility="collapsed")
+churn_days = st.sidebar.slider(
+    "churn_days",
+    min_value=30,
+    max_value=365,
+    value=90,
+    help="Customers Who Stopped Purchasing After What Number of Days",
+    label_visibility="collapsed",
+)
 
 st.sidebar.write("**View Revenue/Volume**")
 view = st.sidebar.selectbox(
-    "view", options=["Revenue", "Volume"], key="view", label_visibility="collapsed")
+    "view", options=["Revenue", "Volume"], key="view", label_visibility="collapsed"
+)
 if view == "price":
     if st.sidebar.checkbox("Add Freight Value to Order"):
-        df['price'] = df['price'] + df['freight_value']
+        df["price"] = df["price"] + df["freight_value"]
 filters = st_filters.filter_widgets(df)
 df = st_filters.filter_data(df, *filters)
 
 
 customer_df = df[~df.duplicated()]
-customer_df = customer_df[customer_df['customer_unique_id'].notnull()]
-total_customers = customer_df['customer_unique_id'].nunique()
+customer_df = customer_df[customer_df["customer_unique_id"].notnull()]
+total_customers = customer_df["customer_unique_id"].nunique()
 
 # Count the number of unique customers who have made a purchase in the last 180 days
-customer_df['Churn'] = np.where(customer_df['order_purchase_timestamp'] >= customer_df['order_purchase_timestamp'].max(
-) - pd.Timedelta(days=churn_days), 0, 1)
+customer_df["Churn"] = np.where(
+    customer_df["order_purchase_timestamp"]
+    >= customer_df["order_purchase_timestamp"].max() - pd.Timedelta(days=churn_days),
+    0,
+    1,
+)
 
-retained_customers = customer_df.loc[customer_df['Churn']
-                                     == 0, "customer_unique_id"].nunique()
+retained_customers = customer_df.loc[
+    customer_df["Churn"] == 0, "customer_unique_id"
+].nunique()
 
 # Calculate the customer retention rate as a percentage of the total customer base
 customer_retention_rate = retained_customers / total_customers * 100
 churn_rate = 100 - customer_retention_rate
 
 # Create a new dataframe containing only the orders that have been delivered
-delivered_orders = df.loc[df['order_delivered_customer_date'].notnull()]
+delivered_orders = df.loc[df["order_delivered_customer_date"].notnull()]
 
 # Create a new dataframe containing only the first order for each customer
-first_orders = delivered_orders.sort_values(
-    'order_purchase_timestamp').groupby('customer_unique_id').first().reset_index()
+first_orders = (
+    delivered_orders.sort_values("order_purchase_timestamp")
+    .groupby("customer_unique_id")
+    .first()
+    .reset_index()
+)
 
 
 # Create a new dataframe containing only the second order for each customer (if it exists)
-second_orders = pd.merge(delivered_orders, first_orders[[
-                         'customer_unique_id', 'order_purchase_timestamp']], on='customer_unique_id', suffixes=['', '_first'])
-second_orders = second_orders.loc[(second_orders['order_purchase_timestamp'] <
-                                   second_orders['order_purchase_timestamp_first'] + pd.Timedelta(days=365)), :]
+second_orders = pd.merge(
+    delivered_orders,
+    first_orders[["customer_unique_id", "order_purchase_timestamp"]],
+    on="customer_unique_id",
+    suffixes=["", "_first"],
+)
+second_orders = second_orders.loc[
+    (
+        second_orders["order_purchase_timestamp"]
+        < second_orders["order_purchase_timestamp_first"] + pd.Timedelta(days=365)
+    ),
+    :,
+]
 
 # Count the number of unique customers who made a second purchase
-renewed_customers = len(second_orders['customer_unique_id'].unique())
+renewed_customers = len(second_orders["customer_unique_id"].unique())
 
 # Calculate the renewal rate as a percentage of the total number of customers
 renewal_rate = (renewed_customers / total_customers) * 100
 
 # Calculate the total revenue generated by all customers
-total_revenue = df['price'].sum()
+total_revenue = df["price"].sum()
 
 # Create a new dataframe containing only the orders that have been delivered
-delivered_orders = df.loc[df['order_delivered_customer_date'].notnull()]
+delivered_orders = df.loc[df["order_delivered_customer_date"].notnull()]
 
 # Create a new dataframe containing only the first order for each customer
-first_orders = delivered_orders.sort_values(
-    'order_purchase_timestamp').groupby('customer_id').first().reset_index()
+first_orders = (
+    delivered_orders.sort_values("order_purchase_timestamp")
+    .groupby("customer_id")
+    .first()
+    .reset_index()
+)
 
 # Create a new dataframe containing only the second order for each customer (if it exists)
-second_orders = pd.merge(delivered_orders, first_orders[[
-                         'customer_id', 'order_purchase_timestamp']], on='customer_id', suffixes=['', '_first'])
-second_orders = second_orders.loc[(second_orders['order_purchase_timestamp'] <
-                                   second_orders['order_purchase_timestamp_first'] + pd.Timedelta(days=365)), :]
+second_orders = pd.merge(
+    delivered_orders,
+    first_orders[["customer_id", "order_purchase_timestamp"]],
+    on="customer_id",
+    suffixes=["", "_first"],
+)
+second_orders = second_orders.loc[
+    (
+        second_orders["order_purchase_timestamp"]
+        < second_orders["order_purchase_timestamp_first"] + pd.Timedelta(days=365)
+    ),
+    :,
+]
 
 # Calculate the total revenue generated by customers who made a second purchase
-renewal_revenue = second_orders['price'].sum()
+renewal_revenue = second_orders["price"].sum()
 
 # Calculate the revenue renewal rate as a percentage of the total revenue
 revenue_renewal_rate = renewal_revenue / total_revenue * 100
@@ -132,74 +168,88 @@ st.header("Customer Insights 👪")
 st.subheader("Overview")
 
 col1, col2 = st.columns(2, gap="small")
-col1.metric("**Total Number of Customers**",
-            value=f"{data_parser.clean_format(total_customers)} ")
+col1.metric(
+    "**Total Number of Customers**",
+    value=f"{data_parser.clean_format(total_customers)} ",
+)
 
-col2.metric("**Total Number of Active Customers**",
-            value=f"{data_parser.clean_format(retained_customers)} ")
+col2.metric(
+    "**Total Number of Active Customers**",
+    value=f"{data_parser.clean_format(retained_customers)} ",
+)
 
 col1, col2, col3, col4 = st.columns(4, gap="small")
-col1.metric("**Customer Retention Rate**",
-            value=f"{data_parser.clean_format(customer_retention_rate)} %")
-col2.metric("**Customer Churn Rate**",
-            value=f"{data_parser.clean_format(churn_rate)} %",
-            help="Customers who haven't made a purchase in the past year")
-col3.metric("**Customer Renewal Rate**",
-            value=f"{data_parser.clean_format(renewal_rate)} %")
-col4.metric("**Revenue Renewal Rate**",
-            value=f"{data_parser.clean_format(revenue_renewal_rate)} %")
+col1.metric(
+    "**Customer Retention Rate**",
+    value=f"{data_parser.clean_format(customer_retention_rate)} %",
+)
+col2.metric(
+    "**Customer Churn Rate**",
+    value=f"{data_parser.clean_format(churn_rate)} %",
+    help="Customers who haven't made a purchase in the past year",
+)
+col3.metric(
+    "**Customer Renewal Rate**", value=f"{data_parser.clean_format(renewal_rate)} %"
+)
+col4.metric(
+    "**Revenue Renewal Rate**",
+    value=f"{data_parser.clean_format(revenue_renewal_rate)} %",
+)
 style_metric_cards()
 st.divider()
 
 st.subheader("Visualization")
 
-tab1, tab2 = st.tabs(["Customer Onboarding Trend",
-                     "Product Perference Per Customer"])
+tab1, tab2 = st.tabs(["Customer Onboarding Trend", "Product Perference Per Customer"])
 
 with tab1:
-    freq = st.selectbox("Select Frequency for Trend", options=[
-        "Daily", "Weekly", "Monthly"])
-    cus_df = df.groupby(by=pd.Grouper(key="order_approved_at", freq=freq[0])).agg(
-        Number_of_Customers=("customer_unique_id", "count")).reset_index()
+    freq = st.selectbox(
+        "Select Frequency for Trend", options=["Daily", "Weekly", "Monthly"]
+    )
+    cus_df = (
+        df.groupby(by=pd.Grouper(key="order_approved_at", freq=freq[0]))
+        .agg(Number_of_Customers=("customer_unique_id", "count"))
+        .reset_index()
+    )
 
     fig = px.line(cus_df, x="order_approved_at", y="Number_of_Customers")
     fig.update_layout(
         showlegend=False,
         title=f"{freq} Customer Traffic",
-        hoverlabel=dict(bgcolor="white", font_size=14,
-                        font_family="Rockwell"),
+        hoverlabel=dict(bgcolor="white", font_size=14, font_family="Rockwell"),
     )
-    st.plotly_chart(fig, use_container_width=True,
-                    config={"displayModeBar": False})
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 with tab2:
     prod_df = df.drop_duplicates(subset="customer_unique_id")
     prod_df = (
-        prod_df.groupby(by="product_category_name").agg(
-            num_customers=("customer_unique_id", "count")).reset_index()
+        prod_df.groupby(by="product_category_name")
+        .agg(num_customers=("customer_unique_id", "count"))
+        .reset_index()
     )
 
     num1, num2 = st.columns([1, 1])
 
     with num1:
-        order = st.selectbox(f"Select Sort Order (Volume)",
-                             options=["Top", "Bottom"])
+        order = st.selectbox(f"Select Sort Order (Volume)", options=["Top", "Bottom"])
         order_ = True if order == "Bottom" else False
 
     with num2:
         num_fal = st.slider(
-            f"Number of Categories to Show", min_value=5, max_value=prod_df["product_category_name"].nunique())
+            f"Number of Categories to Show",
+            min_value=5,
+            max_value=prod_df["product_category_name"].nunique(),
+        )
 
-    top_df = prod_df.sort_values(by="num_customers", ascending=order_)[
-        :num_fal
-    ]
+    top_df = prod_df.sort_values(by="num_customers", ascending=order_)[:num_fal]
 
     line1 = st.empty()
 
     col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
     top_value, avg, med, min_value, max_value = get_key_metrics(
-        top_df, "product_category_name", "num_customers")
+        top_df, "product_category_name", "num_customers"
+    )
 
     perc = np.round(top_value / total_customers * 100)
     line1.markdown(
@@ -208,26 +258,24 @@ with tab2:
 
     with col1:
         annotated_text(
-            "Average Value: ", (f"{data_parser.clean_format(avg)}",
-                                "value", "#83c9ff")
+            "Average Value: ", (f"{data_parser.clean_format(avg)}", "value", "#83c9ff")
         )
 
     with col2:
         annotated_text(
-            "Median Value: ", (f"{data_parser.clean_format(med)}",
-                               "value", "#83c9ff")
+            "Median Value: ", (f"{data_parser.clean_format(med)}", "value", "#83c9ff")
         )
 
     with col3:
         annotated_text(
-            "Min Value: ", (f"{data_parser.clean_format(min_value)}",
-                            "value", "#83c9ff")
+            "Min Value: ",
+            (f"{data_parser.clean_format(min_value)}", "value", "#83c9ff"),
         )
 
     with col4:
         annotated_text(
-            "Max Value: ", (f"{data_parser.clean_format(max_value)}",
-                            "value", "#83c9ff")
+            "Max Value: ",
+            (f"{data_parser.clean_format(max_value)}", "value", "#83c9ff"),
         )
 
     fig = px.bar(
@@ -240,13 +288,11 @@ with tab2:
     fig.update_layout(
         showlegend=False,
         title=f"Customer Interest By Product Category ",
-        hoverlabel=dict(bgcolor="white", font_size=14,
-                        font_family="Rockwell"),
+        hoverlabel=dict(bgcolor="white", font_size=14, font_family="Rockwell"),
     )
     fig.update_xaxes(title_text="Product Category Name")
     fig.update_yaxes(title_text="Number of Customers")
-    st.plotly_chart(fig, use_container_width=True,
-                    config={"displayModeBar": False})
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 st.divider()
 
@@ -255,15 +301,15 @@ st.write("#### Retention Cohort Analysis")
 
 # Churn/Retention Cohort Analysis
 cohort_df = cohort_analysis(df)
-grouping = cohort_df.groupby(['CohortMonth', 'CohortIndex'])
+grouping = cohort_df.groupby(["CohortMonth", "CohortIndex"])
 
 # Count the number of unique values per Customer ID
-cohort_data = grouping['customer_unique_id'].apply(
-    pd.Series.nunique).reset_index()
+cohort_data = grouping["customer_unique_id"].apply(pd.Series.nunique).reset_index()
 
 # Create a pivot
 cohort_counts = cohort_data.pivot(
-    index='CohortMonth', columns='CohortIndex', values='customer_unique_id')
+    index="CohortMonth", columns="CohortIndex", values="customer_unique_id"
+)
 cohort_counts.fillna(0, inplace=True)
 
 # Select the first column and store it to cohort_sizes
@@ -271,14 +317,12 @@ cohort_sizes = cohort_counts.iloc[:, 0]
 
 # Divide the cohort count by cohort sizes along the rows
 
-retention = cohort_counts.divide(cohort_sizes, axis=0)*100
+retention = cohort_counts.divide(cohort_sizes, axis=0) * 100
 retention.index = retention.index.strftime("%Y-%B")
 
 colorscales = px.colors.named_colorscales()
 
-scale = st.selectbox(
-    "Select A Color Scale", options=colorscales, index=4, key="t3"
-)
+scale = st.selectbox("Select A Color Scale", options=colorscales, index=4, key="t3")
 
 fig = px.imshow(
     retention.values.tolist(),
@@ -288,16 +332,14 @@ fig = px.imshow(
     color_continuous_scale=scale,
     title=f"Retention By Month Cohorts",
     template="presentation",
-    text_auto=".2f"
+    text_auto=".2f",
 )
 with fig.batch_update():
     fig.update_xaxes(side="top")
     fig.update_layout(
         margin=dict(l=0, r=0, t=100, b=0),
-        hoverlabel=dict(bgcolor="white", font_size=14,
-                        font_family="Rockwell"),
+        hoverlabel=dict(bgcolor="white", font_size=14, font_family="Rockwell"),
         hovermode="x",
-
     )
 st.plotly_chart(
     fig,
@@ -316,27 +358,30 @@ variables_dict = {
     "Payment Type": "payment_type",
     "Customer State": "customer_state",
     "Seller State": "seller_state",
-    "Product Categories": "product_category_name"
-
+    "Product Categories": "product_category_name",
 }
 variable_key = st.selectbox(
-    "Select Variable To Visualize Relationship", options=variables_dict.keys())
+    "Select Variable To Visualize Relationship", options=variables_dict.keys()
+)
 chosen_col = variables_dict[variable_key]
 
-payment_type_plt = customer_df.groupby(
-    by=chosen_col).Churn.mean().reset_index()
+payment_type_plt = customer_df.groupby(by=chosen_col).Churn.mean().reset_index()
 
 payment_type_plt.sort_values("Churn", ascending=False, inplace=True)
-fig = px.bar(payment_type_plt, x=chosen_col, y="Churn", color=chosen_col,
-             title=f"Relationship Between Churn and {variable_key}", template="presentation")
+fig = px.bar(
+    payment_type_plt,
+    x=chosen_col,
+    y="Churn",
+    color=chosen_col,
+    title=f"Relationship Between Churn and {variable_key}",
+    template="presentation",
+)
 with fig.batch_update():
     fig.update_layout(
         margin=dict(l=0, r=0, t=100, b=0),
-        hoverlabel=dict(bgcolor="white", font_size=14,
-                        font_family="Rockwell"),
+        hoverlabel=dict(bgcolor="white", font_size=14, font_family="Rockwell"),
         hovermode="x",
-        showlegend=False
-
+        showlegend=False,
     )
     fig.update_xaxes(title_text=variable_key)
     fig.update_yaxes(title_text="Average Churn")
@@ -352,20 +397,38 @@ st.divider()
 st.subheader("Churn Prediction")
 # Predicting Probability of Churn of Customers Who Joined in the Last 30 Days
 days_joined = st.columns(2)[0].select_slider(
-    "Select Number of Days for Prediction", options=[60, 90, 180], value=60)
+    "Select Number of Days for Prediction", options=[60, 90, 180], value=60
+)
 
-mask = customer_df.columns.isin(["order_id", "customer_id", "order_purchase_timestamp",
-                                "order_approved_at", "order_delivered_carrier_date",
-                                 "order_delivered_customer_date", "order_estimated_delivery_date",
-                                 "order_item_id", "product_id", "seller_id", "shipping_limit_date", "customer_unique_id",
-                                 "geolocation_city_x", "geolocation_city_y", "geolocation_state_x", "geolocation_state_y"])
+mask = customer_df.columns.isin(
+    [
+        "order_id",
+        "customer_id",
+        "order_purchase_timestamp",
+        "order_approved_at",
+        "order_delivered_carrier_date",
+        "order_delivered_customer_date",
+        "order_estimated_delivery_date",
+        "order_item_id",
+        "product_id",
+        "seller_id",
+        "shipping_limit_date",
+        "customer_unique_id",
+        "geolocation_city_x",
+        "geolocation_city_y",
+        "geolocation_state_x",
+        "geolocation_state_y",
+    ]
+)
 df_model = customer_df.loc[:, ~(mask)].copy()
-df_model = df_model.astype({
-    "customer_city": "category",
-    "seller_city": "category"
-})
-new_customers = customer_df.loc[(customer_df.order_purchase_timestamp >=
-                                customer_df.order_purchase_timestamp.max() - pd.Timedelta(days=days_joined)), :]
+df_model = df_model.astype({"customer_city": "category", "seller_city": "category"})
+new_customers = customer_df.loc[
+    (
+        customer_df.order_purchase_timestamp
+        >= customer_df.order_purchase_timestamp.max() - pd.Timedelta(days=days_joined)
+    ),
+    :,
+]
 
 df_pred = new_customers.loc[:, df_model.columns].drop("Churn", axis=1)
 
@@ -373,73 +436,106 @@ st.write("Pycaret's Best Model")
 ml_models.pycaret_modelling(df_model)
 
 st.write("Prediction Using Pycaret Best Model")
-new_customers.loc[:, "churn_probability"] = ml_models.pycaret_prediction(
-    df_pred)
+new_customers.loc[:, "churn_probability"] = ml_models.pycaret_prediction(df_pred)
 
 with st.expander(
-        f"Showing Predictions of {data_parser.clean_format(new_customers.shape[0])} Customers Who Made A Purchase in the Last {days_joined} Days"):
-    st.dataframe(
-        new_customers[["customer_unique_id", "Churn", "churn_probability"]])
+    f"Showing Predictions of {data_parser.clean_format(new_customers.shape[0])} Customers Who Made A Purchase in the Last {days_joined} Days"
+):
+    st.dataframe(new_customers[["customer_unique_id", "Churn", "churn_probability"]])
 
 st.write("Using Standalone Models")
-selected_key = st.selectbox("Select Model", options=[
-                            "Logistic Regression", "KNearest Neighbours"])
-model = ml_models.train(df_model.drop(
-    columns=['Churn', 'seller_city', 'customer_city']), df_model['Churn'], selected_key)
+selected_key = st.selectbox(
+    "Select Model", options=["Logistic Regression", "KNearest Neighbours"]
+)
+model = ml_models.train(
+    df_model.drop(columns=["Churn", "seller_city", "customer_city"]),
+    df_model["Churn"],
+    selected_key,
+)
 
 st.write("Prediction Using Standalone Models")
-new_customers.loc[:, "churn_probability"] = ml_models.prediction(
-    model, df_pred)
+new_customers.loc[:, "churn_probability"] = ml_models.prediction(model, df_pred)
 
 with st.expander(
-        f"Showing Predictions of {data_parser.clean_format(new_customers.shape[0])} Customers Who Made A Purchase in the Last {days_joined} Days"):
-    st.dataframe(
-        new_customers[["customer_unique_id", "Churn", "churn_probability"]])
+    f"Showing Predictions of {data_parser.clean_format(new_customers.shape[0])} Customers Who Made A Purchase in the Last {days_joined} Days"
+):
+    st.dataframe(new_customers[["customer_unique_id", "Churn", "churn_probability"]])
 
 
 # Geographic Segmentation
 st.subheader("Customer Segmentation")
-colorscale = st.selectbox(
-    "Select Preferred Color Scale", options=colorscales)
+colorscale = st.selectbox("Select Preferred Color Scale", options=colorscales)
 
 col1, col2 = st.columns(2)
 
 with col1:
-    n_clusters = st.slider("Select Number of Clusters",
-                           min_value=2, value=3, max_value=5, key="geo_cluster")
+    n_clusters = st.slider(
+        "Select Number of Clusters",
+        min_value=2,
+        value=3,
+        max_value=5,
+        key="geo_cluster",
+    )
 
-    geo_df = df.groupby(
-        by=["customer_lat", "customer_lng"]).first().reset_index()
-    geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
-                               "customer_lat", "customer_lng"])
+    geo_df = df.groupby(by=["customer_lat", "customer_lng"]).first().reset_index()
+    geo_df = ml_models.cluster(
+        n_clusters=n_clusters, df=geo_df, columns=["customer_lat", "customer_lng"]
+    )
 
-    fig = px.scatter_mapbox(geo_df, lat="customer_lat", lon="customer_lng", color="cluster",
-                            labels={"customer_lat": "Latitude",
-                                    "customer_lng": "Longitude"},
-                            color_continuous_scale=colorscale,
-                            zoom=3.5, mapbox_style="open-street-map", height=650)
-    fig.update_layout(title=f" Geographic Segmentation of Customers",
-                      hoverlabel=dict(bgcolor="white", font_size=14, font_family="Rockwell"),)
-    st.plotly_chart(fig, use_container_width=True,
-                    config={"displayModeBar": False})
+    fig = px.scatter_mapbox(
+        geo_df,
+        lat="customer_lat",
+        lon="customer_lng",
+        color="cluster",
+        labels={"customer_lat": "Latitude", "customer_lng": "Longitude"},
+        color_continuous_scale=colorscale,
+        zoom=3.5,
+        mapbox_style="open-street-map",
+        height=650,
+    )
+    fig.update_layout(
+        title=f" Geographic Segmentation of Customers",
+        hoverlabel=dict(bgcolor="white", font_size=14, font_family="Rockwell"),
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 with col2:
-    n_clusters = st.slider("Select Number of Clusters",
-                           min_value=2, value=2, max_value=5, key="rev_cluster")
+    n_clusters = st.slider(
+        "Select Number of Clusters",
+        min_value=2,
+        value=2,
+        max_value=5,
+        key="rev_cluster",
+    )
 
-    geo_df = df.groupby(["customer_lat", "customer_lng"]).agg(
-        {"price": "sum"}).reset_index()
-    geo_df = ml_models.cluster(n_clusters=n_clusters, df=geo_df, columns=[
-                               "customer_lat", "customer_lng", "price"])
+    geo_df = (
+        df.groupby(["customer_lat", "customer_lng"]).agg({"price": "sum"}).reset_index()
+    )
+    geo_df = ml_models.cluster(
+        n_clusters=n_clusters,
+        df=geo_df,
+        columns=["customer_lat", "customer_lng", "price"],
+    )
 
-    fig = px.scatter_mapbox(geo_df, lat="customer_lat", lon="customer_lng", color="cluster",
-                            labels={"customer_lat": "Latitude",
-                                    "customer_lng": "Longitude",
-                                    "price": "Revenue"},
-                            color_continuous_scale=colorscale, size="price",
-                            zoom=3.5, mapbox_style="open-street-map", height=650)
-    fig.update_layout(title=f" Customer Revenue Segmentation",
-                      hoverlabel=dict(bgcolor="white", font_size=14, font_family="Rockwell"),)
-    st.plotly_chart(fig, use_container_width=True,
-                    config={"displayModeBar": False})
+    fig = px.scatter_mapbox(
+        geo_df,
+        lat="customer_lat",
+        lon="customer_lng",
+        color="cluster",
+        labels={
+            "customer_lat": "Latitude",
+            "customer_lng": "Longitude",
+            "price": "Revenue",
+        },
+        color_continuous_scale=colorscale,
+        size="price",
+        zoom=3.5,
+        mapbox_style="open-street-map",
+        height=650,
+    )
+    fig.update_layout(
+        title=f" Customer Revenue Segmentation",
+        hoverlabel=dict(bgcolor="white", font_size=14, font_family="Rockwell"),
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
